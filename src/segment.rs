@@ -1,9 +1,8 @@
+use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use mhash::MultiHash;
 
-#[allow(variant_size_differences)]
-#[derive(PartialEq, Eq, Clone)]
 /// The possible multiaddr segments.
 ///
 /// # Examples
@@ -22,103 +21,107 @@ use mhash::MultiHash;
 /// ```
 ///
 /// Look at the [implementations](#implementations) section below for more.
-pub enum Segment {
+pub trait Segment: Eq + PartialEq + Clone {
+    fn code() -> u64;
+    fn name() -> &'static str;
+    fn data<'a>(&'a self) -> Box<Iterator<Item=&'a fmt::Display> + 'a>;
+}
+
+macro_rules! segment {
+    ($code:expr, $name:expr, { $(#[$doc:meta])* $ty:ident }) => {
+        $(#[$doc])*
+        #[derive(Eq, PartialEq, Clone)]
+        pub struct $ty;
+        impl Segment for $ty {
+            fn code() -> u64 { $code }
+            fn name() -> &'static str { $name }
+            fn data<'a>(&'a self) -> Box<Iterator<Item=&'a fmt::Display> + 'a> {
+                Box::new(None.into_iter())
+            }
+        }
+    };
+
+    ($code:expr, $name:expr, { $(#[$doc:meta])* $ty:ident { $($arg_name:ident : $arg_ty:path),* } }) => {
+        $(#[$doc])*
+        #[derive(Eq, PartialEq, Clone)]
+        pub struct $ty { $( $arg_name: $arg_ty),* }
+        impl Segment for $ty {
+            fn code() -> u64 { $code }
+            fn name() -> &'static str { $name }
+            fn data<'a>(&'a self) -> Box<Iterator<Item=&'a fmt::Display> + 'a> {
+                let v: Vec<&fmt::Display> = vec![$(&self.$arg_name),*];
+                Box::new(v.into_iter())
+            }
+        }
+    };
+}
+
+segment!(33, "dccp", {
     /// Datagram Congestion Control Protocol, a transport layer protocol.
     /// The argument is the port number.
-    Dccp(u16),
+    Dccp { port: u16 }
+});
 
+segment!(480, "http", {
     /// Hypertext Transfer Protocol, an application layer protocol.
-    Http,
+    Http
+});
 
+segment!(443, "https", {
     /// Hypertext Transfer Protocol layered on top of Transport Layer Security,
     /// an application layer protocol.
-    Https,
+    Https
+});
 
+segment!(4, "ip4", {
     /// Internet Protocol version 4, an internet layer protocol.
-    /// The argument is the IPv4 address.
-    IP4(Ipv4Addr),
+    IP4 { ip: Ipv4Addr }
+});
 
+segment!(41, "ip6", {
     /// Internet Protocol version 6, an internet layer protocol.
-    /// The argument is the IPv6 address.
-    IP6(Ipv6Addr),
+    IP6 { ip: Ipv6Addr }
+});
 
+segment!(421, "ipfs", {
     /// The InterPlanetary File System, an application layer protocol.
-    /// The argument is the public hash of an IPFS node.
-    Ipfs(MultiHash),
+    Ipfs { hash: MultiHash }
+});
 
+segment!(132, "sctp", {
     /// Stream Control Transmission Protocol, a transport layer protocol.
-    /// The argument is the port number.
-    Sctp(u16),
+    Sctp { port: u16 }
+});
 
+segment!(6, "tcp", {
     /// Transmission Control Protocol, a transport layer protocol.
-    /// The argument is the port number.
-    Tcp(u16),
+    Tcp { port: u16 }
+});
 
+segment!(17, "udp", {
     /// User Datagram Protocol, a transport layer protocol.
-    /// The argument is the port number.
-    Udp(u16),
+    Udp { port: u16 }
+});
 
+segment!(301, "udt", {
     /// UDP-based Data Transfer Protocol, an application layer protocol.
-    Udt,
+    Udt
+});
 
+segment!(302, "utp", {
     /// Micro Transport Protocol, an application? layer protocol.
-    Utp,
-}
+    Utp
+});
 
-impl Segment {
-    /// The code used in the binary representation of this segment.
-    pub fn code(&self) -> u64 {
-        match *self {
-            Segment::Dccp(_) => 33,
-            Segment::Http => 480,
-            Segment::Https => 443,
-            Segment::IP4(_) => 4,
-            Segment::IP6(_) => 41,
-            Segment::Ipfs(_) => 421,
-            Segment::Sctp(_) => 132,
-            Segment::Tcp(_) => 6,
-            Segment::Udp(_) => 17,
-            Segment::Udt => 301,
-            Segment::Utp => 302,
-        }
-    }
-
-    /// The name used in the string representation of this segment.
-    pub fn name(&self) -> &'static str {
-        match *self {
-            Segment::Dccp(_) => "dccp",
-            Segment::Http => "http",
-            Segment::Https => "https",
-            Segment::IP4(_) => "ip4",
-            Segment::IP6(_) => "ip6",
-            Segment::Ipfs(_) => "ipfs",
-            Segment::Sctp(_) => "sctp",
-            Segment::Tcp(_) => "tcp",
-            Segment::Udp(_) => "udp",
-            Segment::Udt => "udt",
-            Segment::Utp => "utp",
-        }
+impl From<Ipv4Addr> for IP4 {
+    fn from(ip: Ipv4Addr) -> IP4 {
+        IP4 { ip }
     }
 }
 
-impl From<IpAddr> for Segment {
-    fn from(ip: IpAddr) -> Segment {
-        match ip {
-            IpAddr::V4(ip) => ip.into(),
-            IpAddr::V6(ip) => ip.into(),
-        }
-    }
-}
-
-impl From<Ipv4Addr> for Segment {
-    fn from(ip: Ipv4Addr) -> Segment {
-        Segment::IP4(ip)
-    }
-}
-
-impl From<Ipv6Addr> for Segment {
-    fn from(ip: Ipv6Addr) -> Segment {
-        Segment::IP6(ip)
+impl From<Ipv6Addr> for IP6 {
+    fn from(ip: Ipv6Addr) -> IP6 {
+        IP6 { ip }
     }
 }
 

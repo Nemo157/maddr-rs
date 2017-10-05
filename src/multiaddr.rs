@@ -1,3 +1,4 @@
+use std::fmt;
 use std::ops::Add;
 
 use Segment;
@@ -30,70 +31,43 @@ use Segment;
 ///
 /// ```rust
 /// use std::net::Ipv4Addr;
-/// use std::convert::From;
 /// use maddr::{Segment, MultiAddr};
 ///
 /// let addr = Ipv4Addr::new(1, 2, 3, 4);
-/// let multiaddr = MultiAddr::from(addr) + Segment::Tcp(22);
+/// let multiaddr = Segment::from(addr) + Segment::Tcp(22);
 ///
 /// assert_eq!("/ip4/1.2.3.4/tcp/22", multiaddr.to_string());
 /// ```
-#[derive(Eq, PartialEq, Clone)]
-pub struct MultiAddr {
-    segments: Vec<Segment>,
+pub trait MultiAddr: fmt::Display + Eq + PartialEq + Clone {
 }
 
-impl MultiAddr {
-    /// Create a new `MultiAddr` from the given segments.
-    pub fn new(segments: Vec<Segment>) -> MultiAddr {
-        MultiAddr {
-            segments: segments,
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct S<T: Segment>(T);
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct M<T: MultiAddr, U: Segment>(T, U);
+
+impl<T> MultiAddr for S<T> where T: Segment {
+}
+
+impl<T, U> MultiAddr for M<T, U> where T: MultiAddr, U: Segment {
+}
+
+impl<T> fmt::Display for S<T> where T: Segment {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(f, "/{}", T::name()));
+        for datum in self.0.data() {
+            try!(write!(f, "/{}", datum));
         }
-    }
-
-    /// Get a reference to the segments that make up this `MultiAddr`.
-    pub fn segments(&self) -> &[Segment] {
-        &self.segments
-    }
-
-    /// Attempt to split off the last component of this `MultiAddr`, if this
-    /// address is empty will return `None`, otherwise returns tuple with a
-    /// `MultiAddr` containing all except the last segment and the last segment
-    /// by itself.
-    ///
-    /// An example usecase is in IPFS, peer addresses are formatted as
-    /// `/<routing info>/ipfs/<peer id hash>`, e.g.
-    /// `/ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ`
-    /// refers to a peer identified by the multihash
-    /// `QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ`
-    /// and accessible at `/ip4/104.131.131.82/tcp/4001`
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use maddr::{ MultiAddr, Segment };
-    /// let addr: MultiAddr = "/ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ".parse().unwrap();
-    /// if let Some((addr, Segment::Ipfs(hash))) = addr.split_off_last() {
-    ///     println!("Peer {} is accessible at {}", hash, addr);
-    /// }
-    /// ```
-    pub fn split_off_last(mut self) -> Option<(MultiAddr, Segment)> {
-        self.segments.pop().map(|tail| (self, tail))
+        Ok(())
     }
 }
 
-impl<T> From<T> for MultiAddr where T: Into<Segment> {
-    fn from(segment: T) -> MultiAddr {
-        MultiAddr::new(vec![segment.into()])
-    }
-}
-
-impl<T> Add<T> for MultiAddr where T: Into<MultiAddr> {
-    type Output = MultiAddr;
-
-    fn add(mut self, rhs: T) -> MultiAddr {
-        self.segments.extend_from_slice(&rhs.into().segments);
-        self
+impl<T, U> fmt::Display for M<T, U> where T: MultiAddr, U: Segment {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(f, "{}", self.0));
+        try!(write!(f, "{}", S(self.1.clone())));
+        Ok(())
     }
 }
 

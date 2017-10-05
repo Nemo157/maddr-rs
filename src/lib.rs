@@ -22,15 +22,15 @@ extern crate mhash;
 extern crate varmint;
 
 mod multiaddr;
-mod segment;
+pub mod segment;
 
 mod display;
-mod parse;
-mod read;
-mod write;
+// mod parse;
+// mod read;
+// mod write;
 
 pub use multiaddr::MultiAddr;
 pub use segment::Segment;
 
-pub use read::ReadMultiAddr;
-pub use write::WriteMultiAddr;
+// pub use read::ReadMultiAddr;
+// pub use write::WriteMultiAddr;

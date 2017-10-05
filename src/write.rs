@@ -5,7 +5,7 @@ use varmint::WriteVarInt;
 use mhash::WriteMultiHash;
 
 use { MultiAddr, Segment };
-use Segment::*;
+use segment::*;
 
 trait WriteHelper {
     fn write_u8(&mut self, val: u8) -> io::Result<()>;
